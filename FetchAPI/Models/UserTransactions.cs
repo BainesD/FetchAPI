@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FetchLibrary
+namespace FetchAPI.Models
 {
     public static class UserTransactions
     {

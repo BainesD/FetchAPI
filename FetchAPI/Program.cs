@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using FetchAPI.Data;
+
 namespace FetchAPI
 {
     public class Program
@@ -7,6 +10,8 @@ namespace FetchAPI
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
+
+            builder.Services.AddDbContext<ApiContext>(opt => opt.UseInMemoryDatabase("TransactionDb"));
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

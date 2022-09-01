@@ -1,9 +1,9 @@
-﻿namespace FetchLibrary
+﻿namespace FetchAPI.Models
 {
     public class Transaction
     {
-        public long Id { get; set; }
-        public string PayerName { get; set; }
+        public int Id { get; set; }
+        public string Payer { get; set; }
         public DateTime Timestamp { get; set; }
         public int Points { get; set; }
 
@@ -12,10 +12,10 @@
 
         }
 
-        public Transaction(long id, string name, DateTime timestamp, int points)
+        public Transaction(int id, string name, DateTime timestamp, int points)
         {
             Id = id;
-            PayerName = name;
+            Payer = name;
             Timestamp = timestamp;
             Points = points;
 
