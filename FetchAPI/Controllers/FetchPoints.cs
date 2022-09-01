@@ -26,7 +26,7 @@ namespace FetchAPI.Controllers
         public JsonResult CreateEditTransaction(Transaction transaction)
         {
             //if transaction id is not set an id is assigned automaticaaly
-            if (transaction.Id == 0 || transaction.Id == null)
+            if (transaction.Id is 0 || transaction.Id == null)
             {
                 //add transaction to the database
                 _context.Transactions.Add(transaction);
@@ -35,6 +35,7 @@ namespace FetchAPI.Controllers
             {
                 //search to ensure transaction does not already exist
                 var transactionInDb = _context.Transactions.Find(transaction.Id);
+
                 //if transaction id is entered but no transaction exists returns not found
                 if (transactionInDb == null)
                     return new JsonResult(NotFound());
@@ -60,7 +61,7 @@ namespace FetchAPI.Controllers
             foreach (var transaction in transactions)
             {
                 //If no transaction id is specified transaction is added to Database
-                if (transaction.Id == 0 || transaction.Id == null)
+                if (transaction.Id is 0 || transaction.Id == null)
                 {
                     var transactionModel = _context.Add(transaction);
                 }
@@ -99,6 +100,25 @@ namespace FetchAPI.Controllers
             return new JsonResult(Ok(result));
         }
 
+        [HttpGet]
+        public JsonResult GetWithdrawals()
+        {
+            var allTransactions = _context.Transactions.ToList();
+
+            //adds all withdrawals together for each payer name and creates a list of Withdrawals
+            List<Balance> withdrawsByPayer = allTransactions.GroupBy(t => t.Payer, (key, t) =>
+            {
+                var transactionArray = t as Transaction[] ?? t.ToArray();
+                return new Balance()
+                {
+                    Payer = key,
+                    Points = transactionArray.Where(ta => ta.Points < 0).Sum(tb => tb.Points)
+                };
+            }).ToList();
+
+            return new JsonResult(Ok(withdrawsByPayer));
+        }
+
         //DELETE Transaction by id
         [HttpDelete]
         public JsonResult Delete(int id)
@@ -107,7 +127,7 @@ namespace FetchAPI.Controllers
             var result = _context.Transactions.Find(id);
 
             //if not existing returns not found
-            if (result == null)
+            if (result is null)
                 return new JsonResult(NotFound());
 
             //if existing removes from database and saves changes made to database
@@ -119,12 +139,12 @@ namespace FetchAPI.Controllers
 
         //GET All transactions
         [HttpGet]
-        public JsonResult GetAll()
+        public JsonResult GetAllTransactions()
         {
             //adds all transactions to list
             var result = _context.Transactions.ToList();
             //if no transactions return no content
-            if (result.Count == 0 || result == null)
+            if (result.Count is 0 || result is null)
                 return new JsonResult(NoContent());
 
             return new JsonResult(Ok(result));
@@ -134,6 +154,7 @@ namespace FetchAPI.Controllers
         [HttpPost]
         public JsonResult SpendPoints(int points)
         {
+            #region Creation of Lists for Comparisons
             //add all transactions to a list
             var allTransactions = _context.Transactions.ToList();
 
@@ -152,31 +173,54 @@ namespace FetchAPI.Controllers
                 };
             }).ToList();
 
+            //adds all withdrawals together for each payer name and creates a list of Withdrawals
+            List<Balance> withdrawsByPayer = allTransactions.GroupBy(t => t.Payer, (key, t) =>
+            {
+                var transactionArray = t as Transaction[] ?? t.ToArray();
+                return new Balance()
+                {
+                    Payer = key,
+                    Points = transactionArray.Where(ta => ta.Points < 0).Sum(tb => tb.Points)
+                };
+            }).ToList();
+            #endregion
+
             //while loop to ensure all points are spent
             while (points > 0)
             {
-                //order all transactions by date, youngest to oldest
-                var transactsYoungToOld = allTransactions.OrderBy(t => t.Timestamp);
-                //go through each transaction and compare it to the points balance for the payer
-                foreach (var transaction in transactsYoungToOld)
-                {
-                 
+                //order all transactions by date, oldest to youngest
+                var transactsOldToYoung = allTransactions.OrderBy(t => t.Timestamp);
 
+                //go through each transaction and compare it to the points balance for the payer
+                foreach (var transaction in transactsOldToYoung)
+                {
+                    //create a temporary variable to store the transaction points at the beginning of the process so as not to inadvertently change data
+                    var temp = transaction.Points;
+
+                    //prevents 0 sum transactions which would clutter data
+                    if(points is 0)
+                        break;
+
+                    //goes through each payer and determines the current withdrawal balance
+                    foreach(var withdrawal in withdrawsByPayer)
+                    {
+
+                        //compares withdrawal payer to transaction payer to see if they are the same and then determines if it needs to pass the current transaction
+                        if (transaction.Payer==withdrawal.Payer && withdrawal.Points<0)
+                        {
+                            //updates transaction points for the spending process and withdrawal balance for any further withdrawal comparisons
+                            transaction.Points+=withdrawal.Points;
+                            withdrawal.Points-=withdrawal.Points;
+                        }
+                    }
                     foreach (var payer in pointsByPayer)
                     {
                         //if the payers are the same, transaction points are less than the total payer points, and the payer points are not exhausted continue
-                        if (transaction.Payer == payer.Payer && transaction.Points <= payer.Points && payer.Points != 0)
+                        if (transaction.Payer == payer.Payer && transaction.Points <= payer.Points && payer.Points is not 0)
                         {
-                            //foreach(var uniqueTransaction in allTransactions)
-                            //{
-                            //    if(uniqueTransaction.Points<0 && uniqueTransaction.Payer==transaction.Payer)
-                            //    {
-                            //        transaction.Points += uniqueTransaction.Points;
-                            //    }
-                            //}
 
                             //if the transaction points are positive or negative continue
-                            if (transaction.Points > 0 || transaction.Points < 0)
+                            if (transaction.Points > 0)
                             {
                                 // if the points left is less than the payer balance use what is available from the payer balance and continue
                                 if (points < payer.Points)
@@ -184,22 +228,28 @@ namespace FetchAPI.Controllers
                                     //create and add a new transaction to the in memory Database
                                     transactionsCompleted.Add(new Transaction() { Payer = transaction.Payer, Points = -points, Timestamp = DateTime.Now });
                                     _context.Transactions.Add(new Transaction() { Payer = transaction.Payer, Points = -points, Timestamp = DateTime.Now });
+
                                     //subtract points from the payer balance and the remaining points from the request, thus ending the while loop
                                     payer.Points -= points;
                                     points -= points;
+
                                     //save changes to database
                                     _context.SaveChanges();
                                 }
+
                                 //if the points left are greater than the payer balance continue
                                 if (points >= payer.Points)
                                 {
                                     //subtract the points of the transaction being referenced from the payer's total balance
                                     payer.Points -= transaction.Points;
+
                                     //subtract the points of the transaction from the points requested to spend
                                     points -= transaction.Points;
+
                                     //create and add the new transaction to the database
                                     transactionsCompleted.Add(new Transaction() { Payer = transaction.Payer, Points = -transaction.Points, Timestamp = DateTime.Now });
                                     _context.Transactions.Add(new Transaction() { Payer = transaction.Payer, Points = -transaction.Points, Timestamp = DateTime.Now });
+
                                     //save changes to database
                                     _context.SaveChanges();
                                 }
@@ -207,6 +257,9 @@ namespace FetchAPI.Controllers
                             }
                         }
                     }
+
+                    //returns the value of the transaction points to their correct amount so as to maintain data integrity
+                    transaction.Points = temp;
                 }
             }
             //return that the operation was successful and give the list of new transactions made
