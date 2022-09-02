@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Http;
 using FetchAPI.Models;
 using FetchAPI.Data;
 
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-
 namespace FetchAPI.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -26,7 +24,7 @@ namespace FetchAPI.Controllers
         public JsonResult CreateEditTransaction(Transaction transaction)
         {
             //if transaction id is not set an id is assigned automaticaaly
-            if (transaction.Id is 0 || transaction.Id == null)
+            if (transaction.Id is 0)
             {
                 //add transaction to the database
                 _context.Transactions.Add(transaction);
@@ -37,7 +35,7 @@ namespace FetchAPI.Controllers
                 var transactionInDb = _context.Transactions.Find(transaction.Id);
 
                 //if transaction id is entered but no transaction exists returns not found
-                if (transactionInDb == null)
+                if (transactionInDb is null)
                     return new JsonResult(NotFound());
 
                 //update transaction to new information if id is present
@@ -61,7 +59,7 @@ namespace FetchAPI.Controllers
             foreach (var transaction in transactions)
             {
                 //If no transaction id is specified transaction is added to Database
-                if (transaction.Id is 0 || transaction.Id == null)
+                if (transaction.Id is 0 )
                 {
                     var transactionModel = _context.Add(transaction);
                 }
@@ -70,7 +68,7 @@ namespace FetchAPI.Controllers
                     //search to ensure transaction does not already exist
                     var transactionInDb = _context.Transactions.Find(transaction.Id);
                     //if transaction id is entered but no transaction exists returns not found
-                    if (transactionInDb == null)
+                    if (transactionInDb is null)
                         return new JsonResult(NotFound());
 
                     //update transaction to new information if id is present
@@ -93,7 +91,7 @@ namespace FetchAPI.Controllers
             var result = _context.Transactions.Find(id);
 
             //if no transaction exists return not found
-            if (result == null)
+            if (result is null)
                 return new JsonResult(NotFound());
 
             //if transaction exists return operation successful with specified transaction
